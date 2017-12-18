@@ -23,6 +23,7 @@
     'use strict';
 
     var defaultOptions = {
+      axis: 'Y',
       threshold: 0,
       classNames: {
         aboveThreshold: 'ct-threshold-above',
@@ -37,12 +38,18 @@
     function createMasks(data, options) {
       // Select the defs element within the chart or create a new one
       var defs = data.svg.querySelector('defs') || data.svg.elem('defs');
+      // x1,y1 = bottom left / x2,y2 = top right
       // Project the threshold value on the chart Y axis
-      var projectedThreshold = data.chartRect.height() - data.axisY.projectValue(options.threshold) + data.chartRect.y2;
+      var axisX = options.axis === 'X';
+      var axisY = options.axis === 'Y';
+      var projectedThresholdY = axisY ? data.chartRect.height() - data.axisY.projectValue(options.threshold) + data.chartRect.y2 : null;
+      var projectedThresholdX = axisX ? data.chartRect.width() - data.axisX.projectValue(options.threshold): null;
+      var aboveThresholdY = height - projectedThresholdY;
+      var aboveThresholdX = width - projectedThresholdX;
       var width = data.svg.width();
       var height = data.svg.height();
 
-      // Create mask for upper part above threshold
+      // Create mask for part above threshold
       defs
         .elem('mask', {
           x: 0,
@@ -54,12 +61,12 @@
         .elem('rect', {
           x: 0,
           y: 0,
-          width: width,
-          height: projectedThreshold,
+          width: projectedThresholdX || width,
+          height: projectedThresholdY || height,
           fill: 'white'
         });
 
-      // Create mask for lower part below threshold
+      // Create mask for part below threshold
       defs
         .elem('mask', {
           x: 0,
@@ -71,8 +78,8 @@
         .elem('rect', {
           x: 0,
           y: projectedThreshold,
-          width: width,
-          height: height - projectedThreshold,
+          width: axisX ? aboveThresholdX : width,
+          height: axisY ? aboveThresholdY : height,
           fill: 'white'
         });
 
@@ -84,6 +91,8 @@
 
       options = Chartist.extend({}, defaultOptions, options);
 
+      var thresholdAxis = (option.axis === 'Y') ? 'y' : 'x';
+
       return function ctThreshold(chart) {
         if (chart instanceof Chartist.Line || chart instanceof Chartist.Bar) {
           chart.on('draw', function (data) {
@@ -91,7 +100,7 @@
               // For points we can just use the data value and compare against the threshold in order to determine
               // the appropriate class
               data.element.addClass(
-                data.value.y >= options.threshold ? options.classNames.aboveThreshold : options.classNames.belowThreshold
+                data.value[thresholdAxis] >= options.threshold ? options.classNames.aboveThreshold : options.classNames.belowThreshold
               );
             } else if (data.type === 'line' || data.type === 'bar' || data.type === 'area') {
               // Cloning the original line path, mask it with the upper mask rect above the threshold and add the
